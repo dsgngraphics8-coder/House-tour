@@ -4,37 +4,63 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
   <title>House Tour — Interactive 3D Viewer</title>
-  <meta name="description" content="Interactive 3D house tour — rotate, zoom and explore every room."/>
   <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
   <style>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     :root{--cream:#F5F0E8;--sand:#E2D9C8;--clay:#C4A882;--terra:#A0522D;--deep:#1A1410;--glass:rgba(245,240,232,0.08)}
     html,body{height:100%;background:var(--deep);color:var(--cream);font-family:'DM Sans',sans-serif;overflow:hidden}
-    header{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:18px 28px;background:linear-gradient(to bottom,rgba(26,20,16,0.95) 60%,transparent)}
+
+    /* ── SLIDESHOW ── */
+    #slideshow{position:fixed;inset:0;z-index:300;background:#0a0806}
+    #slideshow.hidden{display:none}
+    .slide{position:absolute;inset:0;opacity:0;transition:opacity 1.2s ease;background-size:cover;background-position:center}
+    .slide.active{opacity:1}
+    .slide-overlay{position:absolute;inset:0;background:linear-gradient(to top,rgba(10,8,6,0.88) 0%,rgba(10,8,6,0.1) 50%,rgba(10,8,6,0.35) 100%)}
+    .slide-brand{position:absolute;top:24px;left:28px;z-index:10}
+    .slide-brand-title{font-family:'Cormorant Garamond',serif;font-size:1.3rem;font-weight:300;letter-spacing:0.1em;color:var(--cream)}
+    .slide-brand-sub{font-size:0.6rem;letter-spacing:0.25em;text-transform:uppercase;color:var(--clay);margin-top:2px}
+    .slide-progress{position:absolute;top:0;left:0;height:2px;background:linear-gradient(90deg,var(--terra),var(--clay));width:0%;z-index:10}
+    .skip-btn{position:absolute;top:24px;right:24px;z-index:10;background:var(--glass);border:1px solid rgba(196,168,130,0.25);backdrop-filter:blur(10px);color:var(--clay);font-size:0.7rem;letter-spacing:0.2em;text-transform:uppercase;padding:8px 18px;border-radius:20px;cursor:pointer;transition:all 0.2s}
+    .skip-btn:hover{background:rgba(196,168,130,0.15);color:var(--cream)}
+    .slide-nav{position:absolute;top:50%;transform:translateY(-50%);z-index:10;background:var(--glass);border:1px solid rgba(196,168,130,0.2);backdrop-filter:blur(10px);color:var(--clay);font-size:1.6rem;width:48px;height:48px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.2s;border-style:solid}
+    .slide-nav:hover{background:rgba(196,168,130,0.15);color:var(--cream)}
+    #prevBtn{left:20px}
+    #nextBtn{right:20px}
+    .slide-info{position:absolute;bottom:90px;left:0;right:0;text-align:center;z-index:10;padding:0 24px}
+    .slide-room{font-family:'Cormorant Garamond',serif;font-size:clamp(2rem,6vw,3.5rem);font-weight:300;letter-spacing:0.12em;color:var(--cream);text-shadow:0 2px 30px rgba(0,0,0,0.6)}
+    .slide-sub{font-size:0.7rem;letter-spacing:0.3em;text-transform:uppercase;color:var(--clay);margin-top:10px}
+    .slide-dots{position:absolute;bottom:44px;left:0;right:0;display:flex;justify-content:center;gap:8px;z-index:10}
+    .dot{width:6px;height:6px;border-radius:50%;background:rgba(196,168,130,0.3);transition:all 0.3s;cursor:pointer}
+    .dot.active{background:var(--clay);width:24px;border-radius:3px}
+    .enter-3d{position:absolute;bottom:110px;left:50%;transform:translateX(-50%);z-index:10;background:var(--terra);color:var(--cream);font-family:'Cormorant Garamond',serif;font-size:1.1rem;letter-spacing:0.15em;padding:14px 40px;border:none;border-radius:4px;cursor:pointer;opacity:0;transition:opacity 0.5s;pointer-events:none;white-space:nowrap}
+    .enter-3d.visible{opacity:1;pointer-events:all}
+    .enter-3d:hover{background:#b5622f}
+
+    /* ── 3D VIEWER ── */
+    #viewer{position:fixed;inset:0;z-index:100;display:none}
+    #viewer.visible{display:block}
+    header{position:fixed;top:0;left:0;right:0;z-index:200;display:flex;align-items:center;justify-content:space-between;padding:18px 28px;background:linear-gradient(to bottom,rgba(26,20,16,0.95) 60%,transparent)}
     .brand-title{font-family:'Cormorant Garamond',serif;font-size:clamp(1.1rem,3vw,1.5rem);font-weight:300;letter-spacing:.08em}
     .brand-sub{font-size:.65rem;letter-spacing:.25em;text-transform:uppercase;color:var(--clay);margin-left:10px}
+    .header-right{display:flex;align-items:center;gap:10px}
     .badge{display:flex;align-items:center;gap:6px;background:var(--glass);border:1px solid rgba(196,168,130,.25);border-radius:20px;padding:6px 14px;font-size:.7rem;letter-spacing:.15em;text-transform:uppercase;color:var(--clay);backdrop-filter:blur(10px)}
     .badge-dot{width:6px;height:6px;border-radius:50%;background:#6fcf6f;animation:pulse 2s infinite}
     @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.4)}}
+    .gallery-btn{background:var(--glass);border:1px solid rgba(196,168,130,.25);border-radius:20px;padding:6px 16px;font-size:.7rem;letter-spacing:.15em;text-transform:uppercase;color:var(--clay);backdrop-filter:blur(10px);cursor:pointer;transition:all 0.2s}
+    .gallery-btn:hover{background:rgba(196,168,130,0.15);color:var(--cream)}
     model-viewer{width:100vw;height:100vh;background-color:transparent;--poster-color:transparent}
-    .hud{position:fixed;bottom:0;left:0;right:0;z-index:100;padding:0 24px 28px;background:linear-gradient(to top,rgba(26,20,16,.95) 40%,transparent);display:flex;align-items:flex-end;justify-content:space-between;gap:16px}
+    .hud{position:fixed;bottom:0;left:0;right:0;z-index:150;padding:0 24px 28px;background:linear-gradient(to top,rgba(26,20,16,.95) 40%,transparent);display:flex;align-items:flex-end;justify-content:space-between;gap:16px}
     .room-pills{display:flex;flex-wrap:wrap;gap:8px;max-width:70%}
     .pill{background:var(--glass);border:1px solid rgba(196,168,130,.2);backdrop-filter:blur(12px);border-radius:20px;padding:6px 14px;font-size:clamp(.6rem,2vw,.72rem);letter-spacing:.1em;text-transform:uppercase;color:var(--sand);white-space:nowrap}
     .controls-hint{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
     .hint-row{display:flex;align-items:center;gap:8px;font-size:.65rem;color:rgba(196,168,130,.6);letter-spacing:.08em}
-    .toolbar{position:fixed;right:20px;top:50%;transform:translateY(-50%);z-index:100;display:flex;flex-direction:column;gap:10px}
+    .toolbar{position:fixed;right:20px;top:50%;transform:translateY(-50%);z-index:150;display:flex;flex-direction:column;gap:10px}
     .tool-btn{width:44px;height:44px;border-radius:12px;background:var(--glass);border:1px solid rgba(196,168,130,.2);backdrop-filter:blur(12px);color:var(--clay);font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;user-select:none}
     .tool-btn:hover{background:rgba(196,168,130,.15);border-color:rgba(196,168,130,.5);color:var(--cream);transform:scale(1.08)}
     .tool-btn.active{background:rgba(160,82,45,.35);border-color:var(--terra);color:var(--cream)}
     .tool-divider{width:1px;height:20px;background:rgba(196,168,130,.15);margin:0 auto}
-    #loader{position:fixed;inset:0;z-index:200;background:var(--deep);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px;transition:opacity .6s ease,visibility .6s}
-    #loader.hidden{opacity:0;visibility:hidden}
-    .loader-title{font-family:'Cormorant Garamond',serif;font-size:clamp(2rem,6vw,3.5rem);font-weight:300;letter-spacing:.12em;color:var(--cream);text-align:center}
-    .loader-sub{font-size:.7rem;letter-spacing:.3em;text-transform:uppercase;color:var(--clay)}
-    .loader-bar-wrap{width:min(280px,70vw);height:1px;background:rgba(196,168,130,.15);position:relative;overflow:hidden}
-    .loader-bar{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,var(--terra),var(--clay));width:0%;transition:width .3s ease}
-    .info-panel{position:fixed;left:20px;top:50%;transform:translateY(-50%) translateX(-120%);z-index:150;width:min(300px,85vw);background:rgba(26,20,16,.92);border:1px solid rgba(196,168,130,.2);backdrop-filter:blur(20px);border-radius:16px;padding:24px;transition:transform .4s cubic-bezier(.34,1.56,.64,1)}
+    .info-panel{position:fixed;left:20px;top:50%;transform:translateY(-50%) translateX(-120%);z-index:160;width:min(300px,85vw);background:rgba(26,20,16,.92);border:1px solid rgba(196,168,130,.2);backdrop-filter:blur(20px);border-radius:16px;padding:24px;transition:transform .4s cubic-bezier(.34,1.56,.64,1)}
     .info-panel.open{transform:translateY(-50%) translateX(0)}
     .info-panel h2{font-family:'Cormorant Garamond',serif;font-size:1.4rem;font-weight:400;color:var(--cream);margin-bottom:4px}
     .info-panel .subtitle{font-size:.65rem;letter-spacing:.2em;text-transform:uppercase;color:var(--clay);margin-bottom:20px}
@@ -43,79 +69,237 @@
     .spec-label{font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;color:var(--clay)}
     .spec-value{font-family:'Cormorant Garamond',serif;font-size:1rem;color:var(--cream)}
     .close-panel{position:absolute;top:14px;right:14px;background:none;border:none;color:var(--clay);font-size:1.1rem;cursor:pointer}
-    @media(max-width:480px){.toolbar{right:12px}.hud{padding:0 16px 20px}.controls-hint{display:none}}
+    #loader{position:fixed;inset:0;z-index:250;background:var(--deep);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px;transition:opacity .6s ease,visibility .6s}
+    #loader.hidden{opacity:0;visibility:hidden;pointer-events:none}
+    .loader-title{font-family:'Cormorant Garamond',serif;font-size:clamp(2rem,6vw,3rem);font-weight:300;letter-spacing:.12em;color:var(--cream);text-align:center}
+    .loader-sub{font-size:.7rem;letter-spacing:.3em;text-transform:uppercase;color:var(--clay)}
+    .loader-bar-wrap{width:min(280px,70vw);height:1px;background:rgba(196,168,130,.15);position:relative;overflow:hidden}
+    .loader-bar{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,var(--terra),var(--clay));width:0%;transition:width .3s ease}
+    @media(max-width:480px){.toolbar{right:12px}.hud{padding:0 16px 20px}.controls-hint{display:none}.slide-nav{display:none}}
   </style>
 </head>
 <body>
+
+  <!-- 3D Loader -->
   <div id="loader">
     <div>
-      <div class="loader-title">House Tour</div>
-      <div class="loader-sub" style="text-align:center;margin-top:8px">Interactive 3D Viewer</div>
+      <div class="loader-title">Loading 3D Model</div>
+      <div class="loader-sub" style="text-align:center;margin-top:8px">Please wait...</div>
     </div>
     <div class="loader-bar-wrap"><div class="loader-bar" id="loaderBar"></div></div>
-    <div class="loader-sub" id="loaderStatus">Loading model...</div>
+    <div class="loader-sub" id="loaderStatus">Preparing...</div>
   </div>
-  <header>
-    <div style="display:flex;align-items:baseline">
-      <span class="brand-title">Residential Floor Plan</span>
-      <span class="brand-sub">3D Preview</span>
+
+  <!-- SLIDESHOW -->
+  <div id="slideshow">
+    <div class="slide-brand">
+      <div class="slide-brand-title">House Tour</div>
+      <div class="slide-brand-sub">2BHK Apartment</div>
     </div>
-    <div class="badge"><div class="badge-dot"></div>Interactive</div>
-  </header>
-  <model-viewer id="mv" src="house.glb" alt="3D House Model"
-    auto-rotate auto-rotate-delay="1500" rotation-per-second="18deg"
-    camera-controls touch-action="pan-y"
-    shadow-intensity="1.2" shadow-softness="0.8" exposure="1.1"
-    environment-image="neutral"
-    camera-orbit="45deg 65deg 40m"
-    min-camera-orbit="auto auto 8m" max-camera-orbit="auto auto 80m"
-    interaction-prompt="none">
-  </model-viewer>
-  <div class="toolbar">
-    <button class="tool-btn active" id="btnRotate" title="Auto Rotate" onclick="toggleRotate()">&#x27F3;</button>
-    <div class="tool-divider"></div>
-    <button class="tool-btn" title="Top View" onclick="setView('0deg 1deg 45m')">&#x2B06;</button>
-    <button class="tool-btn" title="Front View" onclick="setView('0deg 75deg 45m')">&#x2B1B;</button>
-    <button class="tool-btn" title="Isometric" onclick="setView('45deg 65deg 40m')">&#x25C8;</button>
-    <div class="tool-divider"></div>
-    <button class="tool-btn" title="Info" onclick="toggleInfo()">&#x2139;</button>
-  </div>
-  <div class="info-panel" id="infoPanel">
-    <button class="close-panel" onclick="toggleInfo()">&#x2715;</button>
-    <h2>2BHK Apartment</h2>
-    <div class="subtitle">Floor Plan Overview</div>
-    <div class="spec-row"><span class="spec-label">M. Bedroom</span><span class="spec-value">11'2" &times; 11'6"</span></div>
-    <div class="spec-row"><span class="spec-label">Bedroom</span><span class="spec-value">11' &times; 11'6"</span></div>
-    <div class="spec-row"><span class="spec-label">Living Room</span><span class="spec-value">11' &times; 13'4"</span></div>
-    <div class="spec-row"><span class="spec-label">Kitchen</span><span class="spec-value">8' &times; 8'6"</span></div>
-    <div class="spec-row"><span class="spec-label">Dining</span><span class="spec-value">9' &times; 8'6"</span></div>
-    <div class="spec-row"><span class="spec-label">Balcony NW</span><span class="spec-value">32.94 sqft</span></div>
-    <div class="spec-row"><span class="spec-label">Balcony NE</span><span class="spec-value">32.45 sqft</span></div>
-    <div class="spec-row"><span class="spec-label">Balcony Side</span><span class="spec-value">52.44 sqft</span></div>
-  </div>
-  <div class="hud">
-    <div class="room-pills">
-      <div class="pill">M. Bedroom</div><div class="pill">Bedroom</div>
-      <div class="pill">Living Room</div><div class="pill">Kitchen</div>
-      <div class="pill">Dining</div><div class="pill">Passage</div>
-      <div class="pill">3 Balconies</div><div class="pill">2 Bathrooms</div>
+    <div class="slide-progress" id="slideProgress"></div>
+    <button class="skip-btn" onclick="enterViewer()">Skip to 3D &#x2192;</button>
+    <button class="slide-nav" id="prevBtn" onclick="changeSlide(-1)">&#x2039;</button>
+    <button class="slide-nav" id="nextBtn" onclick="changeSlide(1)">&#x203a;</button>
+    <div id="slidesContainer"></div>
+    <div class="slide-info">
+      <div class="slide-room" id="slideRoom"></div>
+      <div class="slide-sub" id="slideSub"></div>
     </div>
-    <div class="controls-hint">
-      <div class="hint-row"><span>&#x1F446;</span> Drag to rotate</div>
-      <div class="hint-row"><span>&#x1F90F;</span> Pinch to zoom</div>
-      <div class="hint-row"><span>&#x270C;&#xFE0F;</span> Two fingers to pan</div>
+    <button class="enter-3d" id="enter3dBtn" onclick="enterViewer()">Explore in 3D &#x2192;</button>
+    <div class="slide-dots" id="slideDots"></div>
+  </div>
+
+  <!-- 3D VIEWER -->
+  <div id="viewer">
+    <header>
+      <div style="display:flex;align-items:baseline">
+        <span class="brand-title">Residential Floor Plan</span>
+        <span class="brand-sub">3D Preview</span>
+      </div>
+      <div class="header-right">
+        <button class="gallery-btn" onclick="backToSlideshow()">&#x2190; Gallery</button>
+        <div class="badge"><div class="badge-dot"></div>Interactive</div>
+      </div>
+    </header>
+    <model-viewer id="mv" src="house.glb" alt="3D House Model"
+      auto-rotate auto-rotate-delay="1500" rotation-per-second="18deg"
+      camera-controls touch-action="pan-y"
+      shadow-intensity="1.2" shadow-softness="0.8" exposure="1.1"
+      environment-image="neutral"
+      camera-orbit="45deg 65deg 40m"
+      min-camera-orbit="auto auto 8m" max-camera-orbit="auto auto 80m"
+      interaction-prompt="none">
+    </model-viewer>
+    <div class="toolbar">
+      <button class="tool-btn active" id="btnRotate" onclick="toggleRotate()">&#x27F3;</button>
+      <div class="tool-divider"></div>
+      <button class="tool-btn" onclick="setView('0deg 1deg 45m')">&#x2B06;</button>
+      <button class="tool-btn" onclick="setView('0deg 75deg 45m')">&#x2B1B;</button>
+      <button class="tool-btn" onclick="setView('45deg 65deg 40m')">&#x25C8;</button>
+      <div class="tool-divider"></div>
+      <button class="tool-btn" onclick="toggleInfo()">&#x2139;</button>
+    </div>
+    <div class="info-panel" id="infoPanel">
+      <button class="close-panel" onclick="toggleInfo()">&#x2715;</button>
+      <h2>2BHK Apartment</h2>
+      <div class="subtitle">Floor Plan Overview</div>
+      <div class="spec-row"><span class="spec-label">M. Bedroom</span><span class="spec-value">11'2" &times; 11'6"</span></div>
+      <div class="spec-row"><span class="spec-label">Bedroom</span><span class="spec-value">11' &times; 11'6"</span></div>
+      <div class="spec-row"><span class="spec-label">Living Room</span><span class="spec-value">11' &times; 13'4"</span></div>
+      <div class="spec-row"><span class="spec-label">Kitchen</span><span class="spec-value">8' &times; 8'6"</span></div>
+      <div class="spec-row"><span class="spec-label">Dining</span><span class="spec-value">9' &times; 8'6"</span></div>
+      <div class="spec-row"><span class="spec-label">Balcony NW</span><span class="spec-value">32.94 sqft</span></div>
+      <div class="spec-row"><span class="spec-label">Balcony NE</span><span class="spec-value">32.45 sqft</span></div>
+      <div class="spec-row"><span class="spec-label">Balcony Side</span><span class="spec-value">52.44 sqft</span></div>
+    </div>
+    <div class="hud">
+      <div class="room-pills">
+        <div class="pill">M. Bedroom</div><div class="pill">Bedroom</div>
+        <div class="pill">Living Room</div><div class="pill">Kitchen</div>
+        <div class="pill">Dining</div><div class="pill">Passage</div>
+        <div class="pill">3 Balconies</div><div class="pill">2 Bathrooms</div>
+      </div>
+      <div class="controls-hint">
+        <div class="hint-row"><span>&#x1F446;</span> Drag to rotate</div>
+        <div class="hint-row"><span>&#x1F90F;</span> Pinch to zoom</div>
+        <div class="hint-row"><span>&#x270C;&#xFE0F;</span> Two fingers to pan</div>
+      </div>
     </div>
   </div>
+
   <script>
-    const mv=document.getElementById('mv'),loader=document.getElementById('loader'),loaderBar=document.getElementById('loaderBar'),loaderStatus=document.getElementById('loaderStatus');
-    let rotating=true;
-    mv.addEventListener('progress',e=>{const p=Math.round(e.detail.totalProgress*100);loaderBar.style.width=p+'%';loaderStatus.textContent=p<100?'Loading model... '+p+'%':'Finalising...'});
-    mv.addEventListener('load',()=>{loaderBar.style.width='100%';loaderStatus.textContent='Ready!';setTimeout(()=>loader.classList.add('hidden'),600)});
-    mv.addEventListener('error',()=>{loaderStatus.textContent='Could not load house.glb';loaderBar.style.background='#c0392b';loaderBar.style.width='100%'});
-    function toggleRotate(){rotating=!rotating;mv.autoRotate=rotating;document.getElementById('btnRotate').classList.toggle('active',rotating)}
-    function setView(o){mv.autoRotate=false;rotating=false;document.getElementById('btnRotate').classList.remove('active');mv.cameraOrbit=o}
-    let infoOpen=false;
-    function toggleInfo(){infoOpen=!infoOpen;document.getElementById('infoPanel').classList.toggle('open',infoOpen)}
+    const slides = [
+      { img: '3209e704-4b22-452b-b098-67233c05b719.png', room: 'Living Room',       sub: "11' \u00d7 13'4\u201d" },
+      { img: '00dd2dfe-e774-4a08-b22c-3a820b01fb9d.png', room: 'Dining',            sub: "9' \u00d7 8'6\u201d" },
+      { img: '87ef4f66-3aed-4ba7-9101-91e54bd7d686.png', room: 'Kitchen',           sub: "8' \u00d7 8'6\u201d" },
+      { img: 'a7c99771-e703-4eab-86bd-c243f8c691a6.png', room: 'Master Bedroom',    sub: "11'2\u201d \u00d7 11'6\u201d" },
+      { img: '036ce539-6adf-4512-8f4f-e343995ba05f.png', room: 'Bedroom',           sub: "11' \u00d7 11'6\u201d" },
+      { img: '08bcdcbc-a845-4b1e-b086-0648b18615dd.png', room: 'Bathroom',          sub: "4' \u00d7 7'8\u201d" },
+      { img: 'b428f0c0-fd06-4bc4-b068-a8452c294a28.png', room: 'Balcony',           sub: '32.94 sqft' },
+      { img: '0fe451cc-185a-420b-a548-59e67e8171f0.png', room: 'Side Balcony',      sub: '52.44 sqft' },
+    ];
+
+    let current = 0;
+    let timer = null;
+    const DURATION = 4000;
+
+    const container  = document.getElementById('slidesContainer');
+    const dotsEl     = document.getElementById('slideDots');
+    const roomEl     = document.getElementById('slideRoom');
+    const subEl      = document.getElementById('slideSub');
+    const progressEl = document.getElementById('slideProgress');
+    const enter3d    = document.getElementById('enter3dBtn');
+
+    slides.forEach((s, i) => {
+      const div = document.createElement('div');
+      div.className = 'slide' + (i === 0 ? ' active' : '');
+      div.style.backgroundImage = "url('" + s.img + "')";
+      const ov = document.createElement('div');
+      ov.className = 'slide-overlay';
+      div.appendChild(ov);
+      container.appendChild(div);
+
+      const dot = document.createElement('div');
+      dot.className = 'dot' + (i === 0 ? ' active' : '');
+      dot.onclick = () => goTo(i);
+      dotsEl.appendChild(dot);
+    });
+
+    function goTo(n) {
+      clearTimeout(timer);
+      document.querySelectorAll('.slide')[current].classList.remove('active');
+      document.querySelectorAll('.dot')[current].classList.remove('active');
+      current = (n + slides.length) % slides.length;
+      document.querySelectorAll('.slide')[current].classList.add('active');
+      document.querySelectorAll('.dot')[current].classList.add('active');
+      roomEl.textContent = slides[current].room;
+      subEl.textContent  = slides[current].sub;
+
+      progressEl.style.transition = 'none';
+      progressEl.style.width = '0%';
+      setTimeout(() => {
+        progressEl.style.transition = 'width ' + DURATION + 'ms linear';
+        progressEl.style.width = '100%';
+      }, 50);
+
+      enter3d.classList.toggle('visible', current === slides.length - 1);
+
+      if (current < slides.length - 1) {
+        timer = setTimeout(() => goTo(current + 1), DURATION);
+      }
+    }
+
+    function changeSlide(dir) { goTo(current + dir); }
+
+    function enterViewer() {
+      clearTimeout(timer);
+      document.getElementById('slideshow').classList.add('hidden');
+      document.getElementById('viewer').classList.remove('hidden');
+      document.getElementById('viewer').classList.add('visible');
+    }
+
+    function backToSlideshow() {
+      document.getElementById('slideshow').classList.remove('hidden');
+      document.getElementById('viewer').classList.remove('visible');
+      document.getElementById('viewer').classList.add('hidden');
+      goTo(current);
+    }
+
+    roomEl.textContent = slides[0].room;
+    subEl.textContent  = slides[0].sub;
+    setTimeout(() => {
+      progressEl.style.transition = 'width ' + DURATION + 'ms linear';
+      progressEl.style.width = '100%';
+    }, 100);
+    timer = setTimeout(() => goTo(1), DURATION);
+
+    // 3D viewer
+    const mv = document.getElementById('mv');
+    let rotating = true;
+
+    mv.addEventListener('progress', e => {
+      const p = Math.round(e.detail.totalProgress * 100);
+      document.getElementById('loaderBar').style.width = p + '%';
+      document.getElementById('loaderStatus').textContent = p < 100 ? 'Loading 3D model... ' + p + '%' : 'Ready!';
+    });
+    mv.addEventListener('load', () => {
+      document.getElementById('loaderBar').style.width = '100%';
+      setTimeout(() => document.getElementById('loader').classList.add('hidden'), 600);
+    });
+    mv.addEventListener('error', () => {
+      document.getElementById('loader').classList.add('hidden');
+    });
+
+    function toggleRotate() {
+      rotating = !rotating; mv.autoRotate = rotating;
+      document.getElementById('btnRotate').classList.toggle('active', rotating);
+    }
+    function setView(o) {
+      mv.autoRotate = false; rotating = false;
+      document.getElementById('btnRotate').classList.remove('active');
+      mv.cameraOrbit = o;
+    }
+    let infoOpen = false;
+    function toggleInfo() {
+      infoOpen = !infoOpen;
+      document.getElementById('infoPanel').classList.toggle('open', infoOpen);
+    }
+
+    // Keyboard
+    document.addEventListener('keydown', e => {
+      if (document.getElementById('slideshow').classList.contains('hidden')) return;
+      if (e.key === 'ArrowRight') changeSlide(1);
+      if (e.key === 'ArrowLeft')  changeSlide(-1);
+      if (e.key === 'Escape')     enterViewer();
+    });
+
+    // Touch swipe
+    let touchX = 0;
+    document.getElementById('slideshow').addEventListener('touchstart', e => touchX = e.touches[0].clientX);
+    document.getElementById('slideshow').addEventListener('touchend', e => {
+      const diff = touchX - e.changedTouches[0].clientX;
+      if (Math.abs(diff) > 50) changeSlide(diff > 0 ? 1 : -1);
+    });
   </script>
 </body>
 </html>
