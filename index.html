@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <title>House Tour — Interactive 3D Viewer</title>
+  <meta name="description" content="Interactive 3D house tour — rotate, zoom and explore every room."/>
+  <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{--cream:#F5F0E8;--sand:#E2D9C8;--clay:#C4A882;--terra:#A0522D;--deep:#1A1410;--glass:rgba(245,240,232,0.08)}
+    html,body{height:100%;background:var(--deep);color:var(--cream);font-family:'DM Sans',sans-serif;overflow:hidden}
+    header{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:18px 28px;background:linear-gradient(to bottom,rgba(26,20,16,0.95) 60%,transparent)}
+    .brand-title{font-family:'Cormorant Garamond',serif;font-size:clamp(1.1rem,3vw,1.5rem);font-weight:300;letter-spacing:.08em}
+    .brand-sub{font-size:.65rem;letter-spacing:.25em;text-transform:uppercase;color:var(--clay);margin-left:10px}
+    .badge{display:flex;align-items:center;gap:6px;background:var(--glass);border:1px solid rgba(196,168,130,.25);border-radius:20px;padding:6px 14px;font-size:.7rem;letter-spacing:.15em;text-transform:uppercase;color:var(--clay);backdrop-filter:blur(10px)}
+    .badge-dot{width:6px;height:6px;border-radius:50%;background:#6fcf6f;animation:pulse 2s infinite}
+    @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.4)}}
+    model-viewer{width:100vw;height:100vh;background-color:transparent;--poster-color:transparent}
+    .hud{position:fixed;bottom:0;left:0;right:0;z-index:100;padding:0 24px 28px;background:linear-gradient(to top,rgba(26,20,16,.95) 40%,transparent);display:flex;align-items:flex-end;justify-content:space-between;gap:16px}
+    .room-pills{display:flex;flex-wrap:wrap;gap:8px;max-width:70%}
+    .pill{background:var(--glass);border:1px solid rgba(196,168,130,.2);backdrop-filter:blur(12px);border-radius:20px;padding:6px 14px;font-size:clamp(.6rem,2vw,.72rem);letter-spacing:.1em;text-transform:uppercase;color:var(--sand);white-space:nowrap}
+    .controls-hint{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+    .hint-row{display:flex;align-items:center;gap:8px;font-size:.65rem;color:rgba(196,168,130,.6);letter-spacing:.08em}
+    .toolbar{position:fixed;right:20px;top:50%;transform:translateY(-50%);z-index:100;display:flex;flex-direction:column;gap:10px}
+    .tool-btn{width:44px;height:44px;border-radius:12px;background:var(--glass);border:1px solid rgba(196,168,130,.2);backdrop-filter:blur(12px);color:var(--clay);font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;user-select:none}
+    .tool-btn:hover{background:rgba(196,168,130,.15);border-color:rgba(196,168,130,.5);color:var(--cream);transform:scale(1.08)}
+    .tool-btn.active{background:rgba(160,82,45,.35);border-color:var(--terra);color:var(--cream)}
+    .tool-divider{width:1px;height:20px;background:rgba(196,168,130,.15);margin:0 auto}
+    #loader{position:fixed;inset:0;z-index:200;background:var(--deep);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px;transition:opacity .6s ease,visibility .6s}
+    #loader.hidden{opacity:0;visibility:hidden}
+    .loader-title{font-family:'Cormorant Garamond',serif;font-size:clamp(2rem,6vw,3.5rem);font-weight:300;letter-spacing:.12em;color:var(--cream);text-align:center}
+    .loader-sub{font-size:.7rem;letter-spacing:.3em;text-transform:uppercase;color:var(--clay)}
+    .loader-bar-wrap{width:min(280px,70vw);height:1px;background:rgba(196,168,130,.15);position:relative;overflow:hidden}
+    .loader-bar{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,var(--terra),var(--clay));width:0%;transition:width .3s ease}
+    .info-panel{position:fixed;left:20px;top:50%;transform:translateY(-50%) translateX(-120%);z-index:150;width:min(300px,85vw);background:rgba(26,20,16,.92);border:1px solid rgba(196,168,130,.2);backdrop-filter:blur(20px);border-radius:16px;padding:24px;transition:transform .4s cubic-bezier(.34,1.56,.64,1)}
+    .info-panel.open{transform:translateY(-50%) translateX(0)}
+    .info-panel h2{font-family:'Cormorant Garamond',serif;font-size:1.4rem;font-weight:400;color:var(--cream);margin-bottom:4px}
+    .info-panel .subtitle{font-size:.65rem;letter-spacing:.2em;text-transform:uppercase;color:var(--clay);margin-bottom:20px}
+    .spec-row{display:flex;justify-content:space-between;align-items:baseline;padding:10px 0;border-bottom:1px solid rgba(196,168,130,.1)}
+    .spec-row:last-child{border-bottom:none}
+    .spec-label{font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;color:var(--clay)}
+    .spec-value{font-family:'Cormorant Garamond',serif;font-size:1rem;color:var(--cream)}
+    .close-panel{position:absolute;top:14px;right:14px;background:none;border:none;color:var(--clay);font-size:1.1rem;cursor:pointer}
+    @media(max-width:480px){.toolbar{right:12px}.hud{padding:0 16px 20px}.controls-hint{display:none}}
+  </style>
+</head>
+<body>
+  <div id="loader">
+    <div>
+      <div class="loader-title">House Tour</div>
+      <div class="loader-sub" style="text-align:center;margin-top:8px">Interactive 3D Viewer</div>
+    </div>
+    <div class="loader-bar-wrap"><div class="loader-bar" id="loaderBar"></div></div>
+    <div class="loader-sub" id="loaderStatus">Loading model...</div>
+  </div>
+  <header>
+    <div style="display:flex;align-items:baseline">
+      <span class="brand-title">Residential Floor Plan</span>
+      <span class="brand-sub">3D Preview</span>
+    </div>
+    <div class="badge"><div class="badge-dot"></div>Interactive</div>
+  </header>
+  <model-viewer id="mv" src="house.glb" alt="3D House Model"
+    auto-rotate auto-rotate-delay="1500" rotation-per-second="18deg"
+    camera-controls touch-action="pan-y"
+    shadow-intensity="1.2" shadow-softness="0.8" exposure="1.1"
+    environment-image="neutral"
+    camera-orbit="45deg 65deg 40m"
+    min-camera-orbit="auto auto 8m" max-camera-orbit="auto auto 80m"
+    interaction-prompt="none">
+  </model-viewer>
+  <div class="toolbar">
+    <button class="tool-btn active" id="btnRotate" title="Auto Rotate" onclick="toggleRotate()">&#x27F3;</button>
+    <div class="tool-divider"></div>
+    <button class="tool-btn" title="Top View" onclick="setView('0deg 1deg 45m')">&#x2B06;</button>
+    <button class="tool-btn" title="Front View" onclick="setView('0deg 75deg 45m')">&#x2B1B;</button>
+    <button class="tool-btn" title="Isometric" onclick="setView('45deg 65deg 40m')">&#x25C8;</button>
+    <div class="tool-divider"></div>
+    <button class="tool-btn" title="Info" onclick="toggleInfo()">&#x2139;</button>
+  </div>
+  <div class="info-panel" id="infoPanel">
+    <button class="close-panel" onclick="toggleInfo()">&#x2715;</button>
+    <h2>2BHK Apartment</h2>
+    <div class="subtitle">Floor Plan Overview</div>
+    <div class="spec-row"><span class="spec-label">M. Bedroom</span><span class="spec-value">11'2" &times; 11'6"</span></div>
+    <div class="spec-row"><span class="spec-label">Bedroom</span><span class="spec-value">11' &times; 11'6"</span></div>
+    <div class="spec-row"><span class="spec-label">Living Room</span><span class="spec-value">11' &times; 13'4"</span></div>
+    <div class="spec-row"><span class="spec-label">Kitchen</span><span class="spec-value">8' &times; 8'6"</span></div>
+    <div class="spec-row"><span class="spec-label">Dining</span><span class="spec-value">9' &times; 8'6"</span></div>
+    <div class="spec-row"><span class="spec-label">Balcony NW</span><span class="spec-value">32.94 sqft</span></div>
+    <div class="spec-row"><span class="spec-label">Balcony NE</span><span class="spec-value">32.45 sqft</span></div>
+    <div class="spec-row"><span class="spec-label">Balcony Side</span><span class="spec-value">52.44 sqft</span></div>
+  </div>
+  <div class="hud">
+    <div class="room-pills">
+      <div class="pill">M. Bedroom</div><div class="pill">Bedroom</div>
+      <div class="pill">Living Room</div><div class="pill">Kitchen</div>
+      <div class="pill">Dining</div><div class="pill">Passage</div>
+      <div class="pill">3 Balconies</div><div class="pill">2 Bathrooms</div>
+    </div>
+    <div class="controls-hint">
+      <div class="hint-row"><span>&#x1F446;</span> Drag to rotate</div>
+      <div class="hint-row"><span>&#x1F90F;</span> Pinch to zoom</div>
+      <div class="hint-row"><span>&#x270C;&#xFE0F;</span> Two fingers to pan</div>
+    </div>
+  </div>
+  <script>
+    const mv=document.getElementById('mv'),loader=document.getElementById('loader'),loaderBar=document.getElementById('loaderBar'),loaderStatus=document.getElementById('loaderStatus');
+    let rotating=true;
+    mv.addEventListener('progress',e=>{const p=Math.round(e.detail.totalProgress*100);loaderBar.style.width=p+'%';loaderStatus.textContent=p<100?'Loading model... '+p+'%':'Finalising...'});
+    mv.addEventListener('load',()=>{loaderBar.style.width='100%';loaderStatus.textContent='Ready!';setTimeout(()=>loader.classList.add('hidden'),600)});
+    mv.addEventListener('error',()=>{loaderStatus.textContent='Could not load house.glb';loaderBar.style.background='#c0392b';loaderBar.style.width='100%'});
+    function toggleRotate(){rotating=!rotating;mv.autoRotate=rotating;document.getElementById('btnRotate').classList.toggle('active',rotating)}
+    function setView(o){mv.autoRotate=false;rotating=false;document.getElementById('btnRotate').classList.remove('active');mv.cameraOrbit=o}
+    let infoOpen=false;
+    function toggleInfo(){infoOpen=!infoOpen;document.getElementById('infoPanel').classList.toggle('open',infoOpen)}
+  </script>
+</body>
+</html>
